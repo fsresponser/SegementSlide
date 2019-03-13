@@ -101,8 +101,10 @@ public class SegementSlideSwitcherView: UIView {
         }
         guard !titleButtons.isEmpty else { return }
         scrollView.addSubview(indicatorView)
-        indicatorView.layer.masksToBounds = true
-        indicatorView.layer.cornerRadius = innerConfig.indicatorHeight/2
+        if config.isCapIndicator {
+            indicatorView.layer.masksToBounds = true
+            indicatorView.layer.cornerRadius = innerConfig.indicatorHeight/2            
+        }
         indicatorView.backgroundColor = innerConfig.indicatorColor
         layoutTitleButtons()
         reloadBadges()
