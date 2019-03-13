@@ -175,7 +175,7 @@ extension SegementSlideViewController {
         
         segementSlideHeaderView.layer.zPosition = -3
         segementSlideContentView.layer.zPosition = -2
-        segementSlideSwitcherView.layer.zPosition = -1
+        //segementSlideSwitcherView.layer.zPosition = -1
         
         let contentSize = CGSize(width: view.bounds.width, height: topLayoutLength+innerHeaderHeight+switcherHeight+contentViewHeight+1)
         if segementSlideScrollView.contentSize != contentSize {
