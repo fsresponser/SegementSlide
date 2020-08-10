@@ -23,13 +23,17 @@ open class SegementSlideViewController: UIViewController {
     internal var innerHeaderView: UIView?
     
     internal var safeAreaTopConstraint: NSLayoutConstraint?
-    internal var parentKeyValueObservation: NSKeyValueObservation!
+//    internal var parentKeyValueObservation: NSKeyValueObservation!
     internal var childKeyValueObservation: NSKeyValueObservation?
     internal var innerBouncesType: BouncesType = .parent
     internal var canParentViewScroll: Bool = true
     internal var canChildViewScroll: Bool = false
     internal var lastChildBouncesTranslationY: CGFloat = 0
     internal var waitTobeResetContentOffsetY: Set<Int> = Set()
+    
+    private var isViewLayouted: Bool = false
+    
+    internal var isObserving: Bool = false
     
     public var slideScrollView: UIScrollView {
         return segementSlideScrollView
@@ -128,12 +132,25 @@ open class SegementSlideViewController: UIViewController {
     
     open override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        layoutSegementSlideScrollView()
+        if !isViewLayouted {
+            isViewLayouted = true
+            layoutSegementSlideScrollView()
+        }
     }
     
     open override func viewDidLoad() {
         super.viewDidLoad()
         setup()
+    }
+
+    override open func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        isObserving = true
+    }
+    
+    override open func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        isObserving = false
     }
     
     /// reload headerView, SwitcherView and ContentView
@@ -185,10 +202,11 @@ open class SegementSlideViewController: UIViewController {
         return segementSlideContentView.dequeueReusableViewController(at: index)
     }
     
-    #if DEBUG
     deinit {
-        debugPrint("\(type(of: self)) deinit")
+        childKeyValueObservation?.invalidate()
+        #if DEBUG
+        debugPrint("\(type(of: self)) did deinit")
+        #endif
     }
-    #endif
     
 }

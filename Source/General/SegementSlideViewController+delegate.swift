@@ -23,6 +23,14 @@ extension SegementSlideViewController: UIScrollViewDelegate {
     
 }
 
+extension SegementSlideViewController: SegementSlideScrollViewDelegate {
+    
+    func segementSlideScrollView(didScroll scrollView: SegementSlideScrollView) {
+        self.parentScrollViewDidScroll(scrollView)
+    }
+    
+}
+
 extension SegementSlideViewController: SegementSlideSwitcherViewDelegate {
     
     public var titlesInSegementSlideSwitcherView: [String] {
@@ -42,6 +50,10 @@ extension SegementSlideViewController: SegementSlideSwitcherViewDelegate {
 }
 
 extension SegementSlideViewController: SegementSlideContentDelegate {
+    
+    public func segementSlideContentView(_ segmentSlideContentView: SegementSlideContentView, didScroll progress: CGFloat, currentPage: Int, nexPage: Int) {
+        segementSlideSwitcherView.animateSwitcherChanging(currentPage, nexPage, progress: progress)
+    }
     
     public var segementSlideContentScrollViewCount: Int {
         return titlesInSwitcher.count
@@ -63,9 +75,9 @@ extension SegementSlideViewController: SegementSlideContentDelegate {
         }
         guard let scrollView = childViewController.scrollView else { return }
         let keyValueObservation = scrollView.observe(\.contentOffset, options: [.new, .old], changeHandler: { [weak self] (scrollView, change) in
-            guard let self = self else { return }
+            guard let sSelf = self, sSelf.isObserving else { return }
             guard change.newValue != change.oldValue else { return }
-            self.childScrollViewDidScroll(scrollView)
+            sSelf.childScrollViewDidScroll(scrollView)
         })
         childKeyValueObservation = keyValueObservation
     }

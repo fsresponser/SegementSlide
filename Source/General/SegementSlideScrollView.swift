@@ -8,7 +8,21 @@
 
 import UIKit
 
+protocol SegementSlideScrollViewDelegate: class {
+    
+    func segementSlideScrollView(didScroll scrollView: SegementSlideScrollView)
+}
+
 internal class SegementSlideScrollView: UIScrollView, UIGestureRecognizerDelegate {
+    
+    weak var slideScrollViewDelegate: SegementSlideScrollViewDelegate?
+    
+    override var contentOffset: CGPoint {
+        didSet {
+            guard contentOffset != oldValue else { return }
+            slideScrollViewDelegate?.segementSlideScrollView(didScroll: self)
+        }
+    }
     
     private var otherGestureRecognizers: [UIGestureRecognizer]?
     

@@ -15,10 +15,14 @@ import UIKit
 }
 
 public protocol SegementSlideContentDelegate: class {
+    
     var segementSlideContentScrollViewCount: Int { get }
     
     func segementSlideContentScrollView(at index: Int) -> SegementSlideContentScrollViewDelegate?
+   
     func segementSlideContentView(_ segementSlideContentView: SegementSlideContentView, didSelectAtIndex index: Int, animated: Bool)
+    
+    func segementSlideContentView(_ segmentSlideContentView: SegementSlideContentView, didScroll progress: CGFloat, currentPage: Int, nexPage: Int)
 }
 
 public class SegementSlideContentView: UIView {
@@ -26,10 +30,13 @@ public class SegementSlideContentView: UIView {
     private let scrollView = UIScrollView()
     private var viewControllers: [Int: SegementSlideContentScrollViewDelegate] = [:]
     private var initSelectedIndex: Int?
+    private var segementContentScrollKeyValueObservation: NSKeyValueObservation?
     
     public private(set) var selectedIndex: Int?
     public weak var delegate: SegementSlideContentDelegate?
     public weak var viewController: UIViewController?
+    
+    internal var isObserving: Bool = false
     
     public override init(frame: CGRect) {
         super.init(frame: frame)
@@ -39,6 +46,12 @@ public class SegementSlideContentView: UIView {
     public required init?(coder aDecoder: NSCoder) {
         super.init(coder: aDecoder)
         setup()
+    }
+    
+    deinit {
+        segementContentScrollKeyValueObservation?.invalidate()
+        segementContentScrollKeyValueObservation = nil
+        debugPrint("xxx\(type(of: self)) deinit")
     }
     
     private func setup() {
@@ -54,6 +67,11 @@ public class SegementSlideContentView: UIView {
         scrollView.showsVerticalScrollIndicator = false
         scrollView.backgroundColor = .clear
         backgroundColor = .white
+        
+        self.segementContentScrollKeyValueObservation = self.scrollView.observe(\.contentOffset, options: [.new, .old], changeHandler: { [weak self] (scrollView, change) in
+            guard let sSelf = self, sSelf.isObserving else { return }
+            sSelf.contentViewScrollViewDidScroll(scrollView: scrollView, change: change)
+        })
     }
     
     public override func layoutSubviews() {
@@ -61,6 +79,15 @@ public class SegementSlideContentView: UIView {
         updateScrollViewContentSize()
         layoutViewControllers()
         recoverInitSelectedIndex()
+    }
+    
+    public override func willMove(toWindow newWindow: UIWindow?) {
+        super.willMove(toWindow: newWindow)
+        if let _ = newWindow {
+            isObserving = true
+        } else {
+            isObserving = false
+        }
     }
     
     /// remove subViews
@@ -122,20 +149,18 @@ extension SegementSlideContentView {
     
     private func removeViewControllers() {
         for (_, value) in viewControllers {
-            guard let childViewController = value as? UIViewController else { continue }
-            childViewController.view.removeFromSuperview()
-            childViewController.removeFromParent()
+            value.view.removeFromSuperview()
+            value.removeFromParent()
         }
         viewControllers.removeAll()
     }
     
     private func layoutViewControllers() {
         for (index, value) in viewControllers {
-            guard let childViewController = value as? UIViewController else { continue }
             let offsetX = CGFloat(index)*scrollView.bounds.width
-            childViewController.view.widthConstraint?.constant = scrollView.bounds.width
-            childViewController.view.heightConstraint?.constant = scrollView.bounds.height
-            childViewController.view.leadingConstraint?.constant = offsetX
+            value.view.widthConstraint?.constant = scrollView.bounds.width
+            value.view.heightConstraint?.constant = scrollView.bounds.height
+            value.view.leadingConstraint?.constant = offsetX
         }
     }
     
@@ -156,6 +181,8 @@ extension SegementSlideContentView {
     }
     
     private func updateSelectedViewController(at index: Int, animated: Bool) {
+        guard isObserving else { return }
+        
         guard scrollView.frame != .zero else {
             initSelectedIndex = index
             return
@@ -166,10 +193,10 @@ extension SegementSlideContentView {
             count != 0, index >= 0, index < count else {
             return
         }
-        if let lastIndex = selectedIndex, let lastChildViewController = segementSlideContentViewController(at: lastIndex) as? UIViewController {
+        if let lastIndex = selectedIndex, let lastChildViewController = segementSlideContentViewController(at: lastIndex) {
             lastChildViewController.beginAppearanceTransition(false, animated: animated)
         }
-        guard let childViewController = segementSlideContentViewController(at: index) as? UIViewController else { return }
+        guard let childViewController = segementSlideContentViewController(at: index) else { return }
         let isAdded = childViewController.view.superview != nil
         if isAdded {
             childViewController.beginAppearanceTransition(true, animated: animated)
@@ -184,7 +211,7 @@ extension SegementSlideContentView {
         childViewController.view.heightConstraint = childViewController.view.heightAnchor.constraint(equalToConstant: scrollView.bounds.height)
         childViewController.view.leadingConstraint = childViewController.view.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor, constant: offsetX)
         scrollView.setContentOffset(CGPoint(x: offsetX, y: scrollView.contentOffset.y), animated: animated)
-        if let lastIndex = selectedIndex, let lastChildViewController = segementSlideContentViewController(at: lastIndex) as? UIViewController {
+        if let lastIndex = selectedIndex, let lastChildViewController = segementSlideContentViewController(at: lastIndex) {
             lastChildViewController.endAppearanceTransition()
         }
         if isAdded {
@@ -194,4 +221,39 @@ extension SegementSlideContentView {
         delegate?.segementSlideContentView(self, didSelectAtIndex: index, animated: animated)
     }
     
+}
+
+
+extension SegementSlideContentView {
+    
+    func contentViewScrollViewDidScroll(scrollView: UIScrollView, change: NSKeyValueObservedChange<CGPoint>) {
+        
+        guard let newValue = change.newValue?.x, let oldValue = change.oldValue?.x else {
+            return
+        }
+        
+        guard scrollView.contentOffset.x > 0, scrollView.contentOffset.x < scrollView.contentSize.width else {
+            return
+        }
+        
+        let floatIndex = scrollView.contentOffset.x/(scrollView.bounds.width)
+        
+        let progress = scrollView.contentOffset.x.truncatingRemainder(dividingBy: scrollView.bounds.width)
+        let rotio = progress / scrollView.bounds.width
+        
+        var currentPage: Int = 0
+        var nextPage: Int = 1
+        if newValue > oldValue {
+            // 右滑
+            nextPage = min(Int(scrollView.contentSize.width/scrollView.bounds.width), Int(floatIndex) + 1)
+            currentPage = Int(floatIndex)
+
+        } else {
+            // 左滑
+            nextPage = max(0, Int(floatIndex))
+            currentPage = min(Int(scrollView.contentSize.width/scrollView.bounds.width), Int(floatIndex) + 1)
+        }
+    
+        delegate?.segementSlideContentView(self, didScroll: rotio, currentPage: currentPage, nexPage: nextPage)
+    }
 }

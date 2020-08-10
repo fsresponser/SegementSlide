@@ -37,6 +37,16 @@ public class SegementSlideSwitcherView: UIView {
     /// you must call `reloadData()` to make it work, after the assignment.
     public var config: SegementSlideSwitcherConfig = SegementSlideSwitcherConfig.shared
     
+    private var isClicking: Bool = false
+    
+    private let scaleIncrement: CGFloat = 1.0 / 3.0
+    
+    private lazy var indicatorFrame: CGRect = {
+        /// 存储最初indicator的位置信息
+        guard let titleButton = self.titleButtons.first else { return CGRect.zero }
+        return CGRect(x: titleButton.center.x-(self.innerConfig.indicatorWidth)/2, y: self.frame.height-self.innerConfig.indicatorHeight, width: self.innerConfig.indicatorWidth, height: self.innerConfig.indicatorHeight)
+    }()
+    
     public override var intrinsicContentSize: CGSize {
         return scrollView.contentSize
     }
@@ -203,18 +213,19 @@ extension SegementSlideSwitcherView {
         if let selectedIndex = selectedIndex, selectedIndex >= 0, selectedIndex < titleButtons.count {
             let titleButton = titleButtons[selectedIndex]
             titleButton.setTitleColor(innerConfig.normalTitleColor, for: .normal)
-            titleButton.titleLabel?.font = innerConfig.normalTitleFont
+            titleButton.transform = .identity
         }
         guard index >= 0, index < titleButtons.count else { return }
         let titleButton = titleButtons[index]
         titleButton.setTitleColor(innerConfig.selectedTitleColor, for: .normal)
-        titleButton.titleLabel?.font = innerConfig.selectedTitleFont
-        if animated, indicatorView.frame != .zero {
+        titleButton.transform = CGAffineTransform(scaleX: 1.0 + scaleIncrement, y: 1.0 + scaleIncrement)
+        
+        if indicatorView.frame != .zero {
             UIView.animate(withDuration: 0.25) {
-                self.indicatorView.frame = CGRect(x: titleButton.frame.origin.x+(titleButton.bounds.width-self.innerConfig.indicatorWidth)/2, y: self.frame.height-self.innerConfig.indicatorHeight, width: self.innerConfig.indicatorWidth, height: self.innerConfig.indicatorHeight)
+                self.indicatorView.frame = CGRect(x:titleButton.center.x-(self.innerConfig.indicatorWidth)/2, y: self.frame.height-self.innerConfig.indicatorHeight, width: self.innerConfig.indicatorWidth, height: self.innerConfig.indicatorHeight)
             }
         } else {
-            indicatorView.frame = CGRect(x: titleButton.frame.origin.x+(titleButton.bounds.width-innerConfig.indicatorWidth)/2, y: frame.height-innerConfig.indicatorHeight, width: innerConfig.indicatorWidth, height: innerConfig.indicatorHeight)
+            self.indicatorView.frame = CGRect(x: titleButton.center.x-(self.innerConfig.indicatorWidth)/2, y: self.frame.height-self.innerConfig.indicatorHeight, width: self.innerConfig.indicatorWidth, height: self.innerConfig.indicatorHeight)
         }
         if case .segement = innerConfig.type {
             var offsetX = titleButton.frame.origin.x-(scrollView.bounds.width-titleButton.bounds.width)/2
@@ -233,7 +244,70 @@ extension SegementSlideSwitcherView {
     }
     
     @objc private func didClickTitleButton(_ button: UIButton) {
-        selectSwitcher(at: button.tag, animated: true)
+        selectSwitcher(at: button.tag, animated: false)
+        isClicking = true
     }
     
 }
+
+extension SegementSlideSwitcherView {
+
+    internal func animateSwitcherChanging(_ currentPage: Int, _ nextPage: Int, progress: CGFloat) {
+        guard currentPage < titleButtons.count, nextPage < titleButtons.count, !isClicking else {
+            isClicking = false 
+            return
+        }
+        let currentTitleButton = self.titleButtons[currentPage]
+        let nextTitleButton = self.titleButtons[nextPage]
+        
+        /// indicator animation
+        let space = abs(nextTitleButton.center.x - currentTitleButton.center.x)
+        let horizontalSpaceIncrement = progress * space
+        var newFrame = self.indicatorFrame
+        newFrame.origin.x += horizontalSpaceIncrement
+        UIView.animate(withDuration: 0.1) {
+            self.indicatorView.frame = newFrame
+        }
+        
+        /// title color animation
+        if let currentTitleColor = currentTitleButton.titleLabel?.textColor,
+            let nextTitleColor = nextTitleButton.titleLabel?.textColor {
+            currentTitleButton.setTitleColor(currentTitleColor
+                .interpolateRGBColorTo(config.normalTitleColor, fraction: progress), for: .normal)
+            nextTitleButton.setTitleColor(nextTitleColor
+                .interpolateRGBColorTo(config.selectedTitleColor, fraction: progress), for: .normal)
+        }
+        
+        /// title font animation
+        let threshold = nextTitleButton.frame.origin.x - currentTitleButton.frame.origin.x
+        var rotio: CGFloat = 0.0
+        if threshold > 0 {
+            rotio = progress
+        } else {
+            rotio = 1 - progress
+        }
+        
+        currentTitleButton.transform = CGAffineTransform(scaleX: 1.0 + (1.0 - rotio) * self.scaleIncrement, y: 1.0 + (1.0 - rotio) * self.scaleIncrement)
+        nextTitleButton.transform = CGAffineTransform(scaleX: 1.0 + rotio * self.scaleIncrement, y: 1.0 + rotio * self.scaleIncrement)
+    }
+}
+
+
+extension UIColor {
+    
+    func interpolateRGBColorTo(_ end: UIColor, fraction: CGFloat) -> UIColor? {
+        
+        guard let c1 = self.cgColor.components, let c2 = end.cgColor.components else { return nil }
+        
+        let f = min(max(0, fraction), 1)
+        
+        let r: CGFloat = CGFloat(c1[0] + (c2[0] - c1[0]) * f)
+        let g: CGFloat = CGFloat(c1[1] + (c2[1] - c1[1]) * f)
+        let b: CGFloat = CGFloat(c1[2] + (c2[2] - c1[2]) * f)
+        let a: CGFloat = CGFloat(c1[3] + (c2[3] - c1[3]) * f)
+        
+        return UIColor(red: r, green: g, blue: b, alpha: a)
+    }
+    
+}
+

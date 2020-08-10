@@ -19,7 +19,7 @@ extension SegementSlideViewController {
         setupSegementSlideHeaderView()
         setupSegementSlideContentView()
         setupSegementSlideSwitcherView()
-        observeScrollViewContentOffset()
+//        observeScrollViewContentOffset()
     }
     
     internal func setupSegementSlideViews() {
@@ -58,15 +58,17 @@ extension SegementSlideViewController {
         segementSlideScrollView.isPagingEnabled = false
         segementSlideScrollView.isScrollEnabled = true
         segementSlideScrollView.delegate = self
+        segementSlideScrollView.slideScrollViewDelegate = self 
     }
     
-    internal func observeScrollViewContentOffset() {
-        parentKeyValueObservation = segementSlideScrollView.observe(\.contentOffset, options: [.initial, .new, .old], changeHandler: { [weak self] (scrollView, change) in
-            guard let self = self else { return }
-            guard change.newValue != change.oldValue else { return }
-            self.parentScrollViewDidScroll(scrollView)
-        })
-    }
+//    internal func observeScrollViewContentOffset() {
+//        let observer = segementSlideScrollView.observe(\.contentOffset, options: [.initial, .new, .old], changeHandler: { [weak self] (scrollView, change) in
+//            guard let self = self else { return }
+//            guard change.newValue != change.oldValue else { return }
+//            self.parentScrollViewDidScroll(scrollView)
+//        })
+//        self.parentKeyValueObservation = observer
+//    }
     
     internal func setupBounces() {
         innerBouncesType = bouncesType
